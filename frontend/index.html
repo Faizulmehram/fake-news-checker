@@ -1,0 +1,110 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Fake News / Claim Checker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; max-width: 720px; margin: 28px auto; padding: 0 16px; color:#111; }
+    h1 { font-size: 1.7rem; margin: 0 0 12px; }
+    .row { margin: 12px 0; }
+    label { display:block; font-weight:600; margin-bottom:6px; }
+    textarea { width:100%; height:150px; font:inherit; padding:10px; }
+    select, button { font:inherit; padding:10px 12px; }
+    button { border-radius:8px; border:1px solid #ddd; background:#fafafa; cursor:pointer; }
+    .result { margin-top:14px; padding:12px; border-radius:10px; border:1px solid #eee; }
+    .REAL { background:#ecfdf5; border-color:#a7f3d0; }
+    .FAKE { background:#fef2f2; border-color:#fecaca; }
+    .UNCERTAIN { background:#fffbeb; border-color:#fde68a; }
+    .muted { color:#666; font-size:.92rem; }
+    .badge { padding:4px 8px; border-radius:6px; font-weight:700; }
+    .badge.REAL { background:#10b981; color:#fff; }
+    .badge.FAKE { background:#ef4444; color:#fff; }
+    .badge.UNCERTAIN { background:#f59e0b; color:#111; }
+    .row.flex { display:flex; gap:10px; align-items:center; }
+  </style>
+</head>
+<body>
+  <h1>📰 Fake News / Claim Checker</h1>
+  <p class="muted">Choose model type, paste text, and click Predict.</p>
+
+  <div class="row">
+    <label for="model">Model</label>
+    <select id="model">
+      <option value="news">News Article (Kaggle)</option>
+      <option value="rafc">Fact-check (Wikipedia)</option>
+      <option value="claim">Claim (LIAR)</option>
+    </select>
+  </div>
+
+  <div class="row">
+    <label for="text">Text</label>
+    <textarea id="text" placeholder="Paste a news paragraph or a short factual claim..."></textarea>
+  </div>
+
+  <div class="row">
+    <button id="btn">Predict</button>
+  </div>
+
+  <div id="out"></div>
+
+ <script>
+  const API = "http://127.0.0.1:8000/predict";
+  const el = (s) => document.querySelector(s);
+
+  function show(msg, cls = "FAKE") {
+    el("#out").innerHTML = `<div class="result ${cls}">${msg}</div>`;
+  }
+
+  async function predictOnce() {
+    const text = el("#text").value.trim();
+    if (!text) { show("<b>Error:</b> please enter some text"); return; }
+
+    const body = {
+      text,
+      model_type: el("#model").value
+      // backend uses default threshold & band
+    };
+
+    // disable button while calling
+    const btn = el("#btn");
+    btn.disabled = true; btn.textContent = "Predicting…";
+
+    try {
+      const res = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+
+      // network/HTTP error
+      if (!res.ok) {
+        const txt = await res.text().catch(() => "");
+        show(`<b>Error ${res.status}:</b> ${res.statusText}<br><small>${txt}</small>`);
+        return;
+      }
+
+      const data = await res.json();
+      const cls = data.label;
+      const badge = `<span class="badge ${cls}">${cls}</span>`;
+      show(`
+        <div class="flex">
+          <div class="grow"><b>Result:</b> ${badge}</div>
+          <div class="muted">p(REAL) = ${Number(data.prob_real).toFixed(3)}</div>
+        </div>
+        <div class="muted">model: ${data.model_type}</div>
+        ${data.note ? `<div class="muted">Note: ${data.note}</div>` : ""}
+      `, cls);
+
+    } catch (err) {
+      show(`<b>Network/JS error:</b> ${err}`);
+      console.error(err);
+    } finally {
+      btn.disabled = false; btn.textContent = "Predict";
+    }
+  }
+
+  el("#btn").addEventListener("click", predictOnce);
+</script>
+</body>
+</html>

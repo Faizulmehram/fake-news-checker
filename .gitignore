@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environment
+.venv/
+env/
+venv/
+
+# Data & models
+data/
+*.csv
+*.tsv
+
+# Hugging Face cache
+~/.cache/
+models/*.joblib
+*.joblib
+*.bin
+*.pt
